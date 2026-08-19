@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import BeneficiaryPortal from './components/BeneficiaryPortal';
 import NgoDashboard from './components/NgoDashboard';
-import ApplicationModal from './components/ApplicationModal';
+import ApplicationModal from './components/ApplicatdsafasdfionModal';
 import { SAMPLE_PROGRAMS, INITIAL_SUBMISSIONS } from './data/samplePrograms';
 import { Sparkles, HeartHandshake, CheckCircle2 } from 'lucide-react';
 
