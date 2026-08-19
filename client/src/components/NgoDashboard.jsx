@@ -10,23 +10,39 @@ import {
   FileText, 
   Sparkles, 
   ShieldCheck, 
-  Award, 
-  ChevronRight, 
+  Plus,
   X, 
-  ArrowUpRight,
   TrendingUp,
-  Download,
-  CheckCircle,
-  AlertTriangle,
-  FolderOpen
+  FolderOpen,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 
-export default function NgoDashboard({ applications, onUpdateStatus, programs }) {
+export default function NgoDashboard({ applications, onUpdateStatus, programs, onCreateProgram }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [programFilter, setProgramFilter] = useState('All');
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [activeTab, setActiveTab] = useState('applications'); // 'applications' | 'programs'
+  const [isAddProgramOpen, setIsAddProgramOpen] = useState(false);
+
+  // New Program form state
+  const [newProg, setNewProg] = useState({
+    name: '',
+    ngoName: '',
+    category: 'job_training',
+    badge: 'New Scheme',
+    tagline: '',
+    description: '',
+    minAge: 18,
+    maxAge: 35,
+    maxAnnualIncome: 250000,
+    locations: 'Pune, Mumbai, All Maharashtra',
+    fundingAmount: '₹30,000 Support',
+    seatsRemaining: 50,
+    benefits: 'Tuition waiver, Mentorship, Certificate',
+    documentsRequired: 'Aadhaar Card, Income Certificate'
+  });
 
   // Metrics computation
   const metrics = useMemo(() => {
@@ -44,7 +60,7 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
       const matchesSearch = 
         app.beneficiaryName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         app.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.extractedProfile.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (app.extractedProfile?.location || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         app.programName.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === 'All' || app.status === statusFilter;
@@ -59,6 +75,52 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
     if (selectedApplication && selectedApplication.id === appId) {
       setSelectedApplication(prev => ({ ...prev, status: newStatus }));
     }
+  };
+
+  const handleCreateProgramSubmit = (e) => {
+    e.preventDefault();
+    if (!newProg.name || !newProg.ngoName) return;
+
+    const formatted = {
+      id: `prog-${Date.now()}`,
+      name: newProg.name,
+      ngoName: newProg.ngoName,
+      category: newProg.category,
+      badge: newProg.badge,
+      tagline: newProg.tagline || 'Empowering eligible beneficiaries',
+      description: newProg.description || newProg.tagline,
+      minAge: Number(newProg.minAge),
+      maxAge: Number(newProg.maxAge),
+      maxAnnualIncome: Number(newProg.maxAnnualIncome),
+      locations: newProg.locations.split(',').map(s => s.trim()),
+      allowedEducation: ['any'],
+      targetGoals: [newProg.category, 'assistance', 'support'],
+      benefits: newProg.benefits.split(',').map(s => s.trim()),
+      documentsRequired: newProg.documentsRequired.split(',').map(s => s.trim()),
+      duration: '3-6 Months',
+      fundingAmount: newProg.fundingAmount,
+      seatsRemaining: Number(newProg.seatsRemaining),
+      deadline: 'Open Year-Round'
+    };
+
+    onCreateProgram(formatted);
+    setIsAddProgramOpen(false);
+    setNewProg({
+      name: '',
+      ngoName: '',
+      category: 'job_training',
+      badge: 'New Scheme',
+      tagline: '',
+      description: '',
+      minAge: 18,
+      maxAge: 35,
+      maxAnnualIncome: 250000,
+      locations: 'Pune, Mumbai, All Maharashtra',
+      fundingAmount: '₹30,000 Support',
+      seatsRemaining: 50,
+      benefits: 'Tuition waiver, Mentorship, Certificate',
+      documentsRequired: 'Aadhaar Card, Income Certificate'
+    });
   };
 
   return (
@@ -139,7 +201,7 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
           </div>
           <p className="text-2xl font-black text-emerald-400">{metrics.approved}</p>
           <div className="mt-2 text-[11px] text-slate-400">
-            <span>₹1.25 Lakh disbursed this week</span>
+            <span>Direct beneficiary transfers</span>
           </div>
         </div>
 
@@ -227,11 +289,11 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
                       <td className="px-4 py-3.5">
                         <div className="font-bold text-white">{app.beneficiaryName}</div>
                         <div className="text-[11px] text-slate-400">
-                          {app.extractedProfile.age} yrs • {app.extractedProfile.location}
+                          {app.extractedProfile?.age} yrs • {app.extractedProfile?.location}
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
-                        <div className="font-medium text-slate-200">{app.programName.split(':')[0]}</div>
+                        <div className="font-medium text-slate-200">{app.programName?.split(':')[0]}</div>
                         <div className="text-[10px] text-slate-500">{app.ngoName}</div>
                       </td>
                       <td className="px-4 py-3.5">
@@ -281,36 +343,147 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
 
       {/* Programs Catalog Tab */}
       {activeTab === 'programs' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {programs.map(prog => (
-            <div key={prog.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                    {prog.ngoName}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-bold text-white">Active NGO Support Schemes ({programs.length})</h3>
+            <button
+              onClick={() => setIsAddProgramOpen(true)}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Scheme</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {programs.map(prog => (
+              <div key={prog.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                      {prog.ngoName}
+                    </span>
+                    <h3 className="text-base font-bold text-white mt-1">{prog.name}</h3>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                    Active Quota: {prog.seatsRemaining} seats
                   </span>
-                  <h3 className="text-base font-bold text-white mt-1">{prog.name}</h3>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                  Active Quota: {prog.seatsRemaining} seats
-                </span>
-              </div>
 
-              <p className="text-xs text-slate-300">{prog.tagline}</p>
+                <p className="text-xs text-slate-300">{prog.tagline}</p>
 
-              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs text-slate-300">
-                <div className="font-bold text-indigo-400 uppercase text-[10px] tracking-wider">
-                  Configured Eligibility Rules
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div>• Age limit: <strong>{prog.minAge}–{prog.maxAge} yrs</strong></div>
-                  <div>• Max Income: <strong>₹{(prog.maxAnnualIncome / 100000).toFixed(1)} Lakh/yr</strong></div>
-                  <div>• Target Locations: <strong>{prog.locations.slice(0, 2).join(', ')}...</strong></div>
-                  <div>• Funding: <strong>{prog.fundingAmount}</strong></div>
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs text-slate-300">
+                  <div className="font-bold text-indigo-400 uppercase text-[10px] tracking-wider">
+                    Configured Eligibility Rules
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>• Age limit: <strong>{prog.minAge}–{prog.maxAge} yrs</strong></div>
+                    <div>• Max Income: <strong>₹{(prog.maxAnnualIncome / 100000).toFixed(1)} Lakh/yr</strong></div>
+                    <div>• Locations: <strong>{(prog.locations || []).slice(0, 2).join(', ')}...</strong></div>
+                    <div>• Funding: <strong>{prog.fundingAmount}</strong></div>
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add New Program Modal */}
+      {isAddProgramOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-6 space-y-4 my-8">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white">Create New NGO Scheme</h3>
+              <button onClick={() => setIsAddProgramOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ))}
+
+            <form onSubmit={handleCreateProgramSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Scheme / Program Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newProg.name}
+                  onChange={(e) => setNewProg({ ...newProg, name: e.target.value })}
+                  placeholder="e.g. Medha Solar Technician Grant"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">NGO Organization Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newProg.ngoName}
+                  onChange={(e) => setNewProg({ ...newProg, ngoName: e.target.value })}
+                  placeholder="e.g. Green Energy Vikas Trust"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Min Age</label>
+                  <input
+                    type="number"
+                    value={newProg.minAge}
+                    onChange={(e) => setNewProg({ ...newProg, minAge: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Max Age</label>
+                  <input
+                    type="number"
+                    value={newProg.maxAge}
+                    onChange={(e) => setNewProg({ ...newProg, maxAge: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Max Annual Income Ceiling (₹)</label>
+                <input
+                  type="number"
+                  value={newProg.maxAnnualIncome}
+                  onChange={(e) => setNewProg({ ...newProg, maxAnnualIncome: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Funding / Benefit Details</label>
+                <input
+                  type="text"
+                  value={newProg.fundingAmount}
+                  onChange={(e) => setNewProg({ ...newProg, fundingAmount: e.target.value })}
+                  placeholder="e.g. ₹25,000 stipend + kit"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddProgramOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+                >
+                  Publish Scheme
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -367,19 +540,19 @@ export default function NgoDashboard({ applications, onUpdateStatus, programs })
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Age:</span>
-                      <span className="text-white">{selectedApplication.extractedProfile.age} Years</span>
+                      <span className="text-white">{selectedApplication.extractedProfile?.age} Years</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Location:</span>
-                      <span className="text-white">{selectedApplication.extractedProfile.location}</span>
+                      <span className="text-white">{selectedApplication.extractedProfile?.location}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Education:</span>
-                      <span className="text-white">{selectedApplication.extractedProfile.education}</span>
+                      <span className="text-white">{selectedApplication.extractedProfile?.education}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Income:</span>
-                      <span className="text-emerald-400">{selectedApplication.extractedProfile.incomeLevel}</span>
+                      <span className="text-emerald-400">{selectedApplication.extractedProfile?.incomeLevel}</span>
                     </div>
                   </div>
                 </div>

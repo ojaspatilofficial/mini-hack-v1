@@ -3,32 +3,40 @@ import Header from './components/Header';
 import BeneficiaryPortal from './components/BeneficiaryPortal';
 import NgoDashboard from './components/NgoDashboard';
 import ApplicationModal from './components/ApplicationModal';
+import { 
+  getPrograms, 
+  getApplications, 
+  submitApplication, 
+  updateAppStatus, 
+  createProgram 
+} from './services/api';
 import { SAMPLE_PROGRAMS, INITIAL_SUBMISSIONS } from './data/samplePrograms';
-import { Sparkles, HeartHandshake, CheckCircle2 } from 'lucide-react';
+import { HeartHandshake, CheckCircle2 } from 'lucide-react';
 
 function App() {
   const [activePortal, setActivePortal] = useState('beneficiary'); // 'beneficiary' | 'ngo'
-  const [programs] = useState(SAMPLE_PROGRAMS);
-  const [applications, setApplications] = useState(() => {
-    const saved = localStorage.getItem('sahayak_applications');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return INITIAL_SUBMISSIONS;
-  });
-
+  const [programs, setPrograms] = useState(SAMPLE_PROGRAMS);
+  const [applications, setApplications] = useState(INITIAL_SUBMISSIONS);
   const [activeApplicationContext, setActiveApplicationContext] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Sync with LocalStorage
+  // Load programs & applications on mount
   useEffect(() => {
-    localStorage.setItem('sahayak_applications', JSON.stringify(applications));
-  }, [applications]);
+    async function loadData() {
+      try {
+        const [progs, apps] = await Promise.all([
+          getPrograms(),
+          getApplications()
+        ]);
+        if (progs && progs.length) setPrograms(progs);
+        if (apps && apps.length) setApplications(apps);
+      } catch (err) {
+        console.warn('Using local dataset:', err);
+      }
+    }
+    loadData();
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -40,16 +48,25 @@ function App() {
     setIsModalOpen(true);
   };
 
-  const handleApplicationSubmitted = (newSubmission) => {
-    setApplications(prev => [newSubmission, ...prev]);
-    showToast(`Application #${newSubmission.id} received! NGO staff can now review.`);
+  const handleApplicationSubmitted = async (newSubmission) => {
+    // Save to API / LocalStorage
+    const saved = await submitApplication(newSubmission);
+    setApplications(prev => [saved, ...prev.filter(a => a.id !== saved.id)]);
+    showToast(`Application #${saved.id} submitted! Visible in NGO dashboard.`);
   };
 
-  const handleUpdateStatus = (appId, newStatus) => {
+  const handleUpdateStatus = async (appId, newStatus) => {
+    await updateAppStatus(appId, newStatus);
     setApplications(prev =>
       prev.map(app => (app.id === appId ? { ...app, status: newStatus } : app))
     );
     showToast(`Status updated to "${newStatus}" for #${appId}`);
+  };
+
+  const handleCreateProgram = async (newProgData) => {
+    const created = await createProgram(newProgData);
+    setPrograms(prev => [created, ...prev]);
+    showToast(`New scheme "${created.name}" published!`);
   };
 
   const pendingCount = applications.filter(a => a.status === 'Pending Review').length;
@@ -84,6 +101,7 @@ function App() {
             applications={applications}
             programs={programs}
             onUpdateStatus={handleUpdateStatus}
+            onCreateProgram={handleCreateProgram}
           />
         )}
       </main>
