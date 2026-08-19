@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import BeneficiaryPortal from './components/BeneficiaryPortal';
 import NgoDashboard from './components/NgoDashboard';
+
 import ApplicationModal from './components/ApplicationModal';
 import { 
   getPrograms, 
@@ -10,6 +11,8 @@ import {
   updateAppStatus, 
   createProgram 
 } from './services/api';
+
+
 import { SAMPLE_PROGRAMS, INITIAL_SUBMISSIONS } from './data/samplePrograms';
 import { HeartHandshake, CheckCircle2 } from 'lucide-react';
 
