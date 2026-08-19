@@ -1,122 +1,126 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import Header from './components/Header';
+import BeneficiaryPortal from './components/BeneficiaryPortal';
+import NgoDashboard from './components/NgoDashboard';
+import ApplicationModal from './components/ApplicationModal';
+import { SAMPLE_PROGRAMS, INITIAL_SUBMISSIONS } from './data/samplePrograms';
+import { Sparkles, HeartHandshake, CheckCircle2 } from 'lucide-react';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activePortal, setActivePortal] = useState('beneficiary'); // 'beneficiary' | 'ngo'
+  const [programs] = useState(SAMPLE_PROGRAMS);
+  const [applications, setApplications] = useState(() => {
+    const saved = localStorage.getItem('sahayak_applications');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return INITIAL_SUBMISSIONS;
+  });
+
+  const [activeApplicationContext, setActiveApplicationContext] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Sync with LocalStorage
+  useEffect(() => {
+    localStorage.setItem('sahayak_applications', JSON.stringify(applications));
+  }, [applications]);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleStartApplication = (context) => {
+    setActiveApplicationContext(context);
+    setIsModalOpen(true);
+  };
+
+  const handleApplicationSubmitted = (newSubmission) => {
+    setApplications(prev => [newSubmission, ...prev]);
+    showToast(`Application #${newSubmission.id} received! NGO staff can now review.`);
+  };
+
+  const handleUpdateStatus = (appId, newStatus) => {
+    setApplications(prev =>
+      prev.map(app => (app.id === appId ? { ...app, status: newStatus } : app))
+    );
+    showToast(`Status updated to "${newStatus}" for #${appId}`);
+  };
+
+  const pendingCount = applications.filter(a => a.status === 'Pending Review').length;
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 px-4 py-3 rounded-2xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-2xl shadow-emerald-500/30 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-slate-950" />
+          <span>{toastMessage}</span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      )}
 
-      <div className="ticks"></div>
+      {/* Main Header */}
+      <Header
+        activePortal={activePortal}
+        setActivePortal={setActivePortal}
+        pendingCount={pendingCount}
+        totalApplications={applications.length}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {activePortal === 'beneficiary' ? (
+          <BeneficiaryPortal
+            programs={programs}
+            onStartApplication={handleStartApplication}
+          />
+        ) : (
+          <NgoDashboard
+            applications={applications}
+            programs={programs}
+            onUpdateStatus={handleUpdateStatus}
+          />
+        )}
+      </main>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* Application Multi-step Modal */}
+      <ApplicationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        applicationContext={activeApplicationContext}
+        onSubmitSuccess={handleApplicationSubmitted}
+      />
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-slate-800 bg-slate-950 py-8 text-center text-xs text-slate-400">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center space-x-2">
+            <HeartHandshake className="w-4 h-4 text-emerald-400" />
+            <span className="font-semibold text-white">Sahayak Platform</span>
+            <span>— Bridging grassroots beneficiaries with verified NGO funding</span>
+          </div>
+
+          <div className="flex items-center space-x-4 text-slate-400">
+            <span>Transparent Rules Engine</span>
+            <span>•</span>
+            <span>Privacy-First KYC</span>
+            <span>•</span>
+            <button 
+              onClick={() => setActivePortal(activePortal === 'beneficiary' ? 'ngo' : 'beneficiary')}
+              className="text-emerald-400 hover:underline font-semibold"
+            >
+              Switch to {activePortal === 'beneficiary' ? 'NGO Staff View' : 'Beneficiary View'}
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 }
 
-export default App
+export default App;
