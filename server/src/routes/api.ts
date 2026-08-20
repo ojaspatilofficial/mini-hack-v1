@@ -3,16 +3,24 @@ import { Program } from '../models/Program';
 import { Application } from '../models/Application';
 import { aiService } from '../services/aiService';
 import { DEFAULT_PROGRAMS, DEFAULT_APPLICATIONS } from '../data/seedData';
+import { 
+  getProgramsFromSupabase, 
+  insertProgramToSupabase, 
+  getApplicationsFromSupabase, 
+  insertApplicationToSupabase, 
+  updateApplicationInSupabase,
+  isSupabaseConfigured
+} from '../services/supabase';
 
 const router = Router();
 
-// In-Memory Fallback store in case MongoDB is disconnected
+// In-Memory Fallback store in case external databases are disconnected
 let memPrograms = [...DEFAULT_PROGRAMS];
 let memApplications = [...DEFAULT_APPLICATIONS];
 
 // Helper to determine if MongoDB is active
 const isMongoConnected = () => {
-  return Program.db.readyState === 1;
+  return Program.db?.readyState === 1;
 };
 
 /**
@@ -52,9 +60,15 @@ router.post('/extract-and-match', async (req: Request, res: Response): Promise<v
     // 1. Extract profile
     const profile = await aiService.extractProfile(prompt);
 
-    // 2. Fetch programs
+    // 2. Fetch programs from Supabase -> MongoDB -> Fallback
     let programs: any[] = [];
-    if (isMongoConnected()) {
+    if (isSupabaseConfigured()) {
+      const supaProgs = await getProgramsFromSupabase();
+      if (supaProgs && supaProgs.length > 0) {
+        programs = supaProgs;
+      }
+    }
+    if (!programs.length && isMongoConnected()) {
       programs = await Program.find().lean();
     }
     if (!programs.length) {
@@ -81,6 +95,14 @@ router.post('/extract-and-match', async (req: Request, res: Response): Promise<v
  */
 router.get('/programs', async (_req: Request, res: Response): Promise<void> => {
   try {
+    if (isSupabaseConfigured()) {
+      const supaProgs = await getProgramsFromSupabase();
+      if (supaProgs && supaProgs.length > 0) {
+        res.json(supaProgs);
+        return;
+      }
+    }
+
     if (isMongoConnected()) {
       const programs = await Program.find().lean();
       if (programs.length > 0) {
@@ -105,10 +127,14 @@ router.post('/programs', async (req: Request, res: Response): Promise<void> => {
       id: req.body.id || `prog-${Date.now()}`
     };
 
+    // Save to Supabase
+    if (isSupabaseConfigured()) {
+      await insertProgramToSupabase(newProgData);
+    }
+
+    // Save to MongoDB
     if (isMongoConnected()) {
-      const created = await Program.create(newProgData);
-      res.status(201).json(created);
-      return;
+      await Program.create(newProgData);
     }
 
     memPrograms.push(newProgData);
@@ -125,6 +151,17 @@ router.post('/programs', async (req: Request, res: Response): Promise<void> => {
 router.get('/applications', async (req: Request, res: Response): Promise<void> => {
   try {
     const { status, programId, search } = req.query;
+
+    if (isSupabaseConfigured()) {
+      const supaApps = await getApplicationsFromSupabase({
+        status: status ? String(status) : undefined,
+        search: search ? String(search) : undefined
+      });
+      if (supaApps && supaApps.length > 0) {
+        res.json(supaApps);
+        return;
+      }
+    }
 
     let apps: any[] = [];
     if (isMongoConnected()) {
@@ -146,7 +183,7 @@ router.get('/applications', async (req: Request, res: Response): Promise<void> =
         const matchesSearch = !search || 
           app.beneficiaryName.toLowerCase().includes(String(search).toLowerCase()) ||
           app.id.toLowerCase().includes(String(search).toLowerCase()) ||
-          app.extractedProfile.location.toLowerCase().includes(String(search).toLowerCase());
+          (app.extractedProfile?.location || '').toLowerCase().includes(String(search).toLowerCase());
         return matchesStatus && matchesProgram && matchesSearch;
       });
     }
@@ -170,10 +207,14 @@ router.post('/applications', async (req: Request, res: Response): Promise<void> 
       status: req.body.status || 'Pending Review'
     };
 
+    // Save to Supabase
+    if (isSupabaseConfigured()) {
+      await insertApplicationToSupabase(appData);
+    }
+
+    // Save to MongoDB
     if (isMongoConnected()) {
-      const created = await Application.create(appData);
-      res.status(201).json(created);
-      return;
+      await Application.create(appData);
     }
 
     memApplications.unshift(appData);
@@ -189,7 +230,7 @@ router.post('/applications', async (req: Request, res: Response): Promise<void> 
  */
 router.get('/applications/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     if (isMongoConnected()) {
       const app = await Application.findOne({ id }).lean();
       if (app) {
@@ -214,8 +255,12 @@ router.get('/applications/:id', async (req: Request, res: Response): Promise<voi
  */
 router.patch('/applications/:id/status', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { status, staffNotes } = req.body;
+
+    if (isSupabaseConfigured()) {
+      await updateApplicationInSupabase(id, status, staffNotes);
+    }
 
     if (isMongoConnected()) {
       const updateData: any = {};
@@ -260,7 +305,7 @@ router.get('/metrics', async (_req: Request, res: Response): Promise<void> => {
     const pending = apps.filter(a => a.status === 'Pending Review').length;
     const inReview = apps.filter(a => a.status === 'In Review').length;
     const approved = apps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length;
-    const highMatch = apps.filter(a => a.matchScore >= 95).length;
+    const highMatch = apps.filter(a => (a.matchScore || 0) >= 95).length;
 
     res.json({ total, pending, inReview, approved, highMatch });
   } catch (error) {
